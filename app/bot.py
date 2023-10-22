@@ -21,6 +21,14 @@ def timestamp_to_usec(timestamp):
     return post_dt.timestamp()
 
 
+def is_reply(tweet: dict):
+    # This is not really a surefire method to get replies
+    if tweet["full_text"][0] == "@":
+        return True
+    else:
+        return False
+
+
 def tweets_import(directory):
     # Open the tweets.js file and parse it correctly
     rawfile = open(f"{directory}/data/tweets.js")
@@ -48,7 +56,8 @@ def tweets_import(directory):
                     "img2": "",
                     "img3": "",
                     "img4": "",
-                    "usec": timestamp_to_usec(tweet["tweet"]["created_at"])
+                    "usec": timestamp_to_usec(tweet["tweet"]["created_at"]),
+                    "is_reply": is_reply(tweet["tweet"])
                 }
         )
     # Create the df
@@ -68,20 +77,60 @@ def tweets_import(directory):
     return tweets, tweet_dict, df
 
 
+def get_or_create_output_sheet(directory: str, dataframe: pd.DataFrame):
+
+    files_in_dir = os.listdir(directory)
+
+    print(files_in_dir)
+
+    if "output_sheet.xlsx" in files_in_dir:
+        # Find the file, important it into Pandas, return the df
+        output = pd.read_excel(f"{directory}/output_sheet.xlsx")
+
+        # TODO: Far future, check to see if the df has tweets not
+        #       found in the extant output sheet because that's an issue
+
+    else:
+        output = dataframe.assign(
+                        content_warning="",
+                        img1_caption="",
+                        img2_caption="",
+                        img3_caption="",
+                        img4_caption="",
+                        privacy=""
+            )
+
+        output.to_excel(f"{directory}/output_sheet.xlsx", index=False)
+
+    return output
+
+def make_year_offset_for_now(offset):
+    tzinfo = dt.timezone(dt.timedelta(hours=0))
+    real_now = dt.datetime.now(tzinfo)
+    # TODO: not done yet
+
+    return real_now
+
+
 if __name__ == "__main__":
     # test_post()
 
     # Import the tweets file to json and pandas data frame
-    directory = "files/twitter 2022"
-    tweets, tweet_dict, df = tweets_import(directory)
+    archive_directory = "files/twitter 2022"
+    file_dir = "files"
+    tweets, tweet_dict, df = tweets_import(archive_directory)
     print(tweets[0])
     print(df.loc[df['id_str'] == "1604577768158674945"])
+
+    print(tweet_dict["1001260139"])
+
+    # Sort by date
     df = df.sort_values(by=["usec"])
     print(str(df["usec"].head(5)))
-    print(tweet_dict["1604577768158674945"])
-    # Sort by date
 
     # Check for output sheet; create if not found
+    output_sheet = get_or_create_output_sheet(file_dir, df)
+    print(output_sheet.head(5))
 
     # Fetch ID of next tweet
 
