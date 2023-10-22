@@ -102,14 +102,43 @@ def get_or_create_output_sheet(directory: str, dataframe: pd.DataFrame):
 
         output.to_excel(f"{directory}/output_sheet.xlsx", index=False)
 
+    output = output.astype(
+        dtype={
+            "id_str": "str",
+            "created_at": "object",
+            "full_text": "object",
+            "img1": "object",
+            "img2": "object",
+            "img3": "object",
+            "img4": "object",
+            "usec": "object",
+            "content_warning": "str",
+            "img1_caption": "str",
+            "img2_caption": "str",
+            "img3_caption": "str",
+            "img4_caption": "str",
+            "privacy": "str"
+        }
+    )
+
     return output
+
 
 def make_year_offset_for_now(offset):
     tzinfo = dt.timezone(dt.timedelta(hours=0))
-    real_now = dt.datetime.now(tzinfo)
-    # TODO: not done yet
+    utc_now = dt.datetime.now(tzinfo)
 
-    return real_now
+    time_then = dt.datetime(
+        year=(utc_now.year - offset),
+        month=utc_now.month,
+        day=utc_now.day,
+        hour=utc_now.hour,
+        minute=utc_now.minute,
+        second=utc_now.second,
+        tzinfo=utc_now.tzinfo
+    )
+
+    return time_then
 
 
 if __name__ == "__main__":
@@ -119,24 +148,56 @@ if __name__ == "__main__":
     archive_directory = "files/twitter 2022"
     file_dir = "files"
     tweets, tweet_dict, df = tweets_import(archive_directory)
-    print(tweets[0])
-    print(df.loc[df['id_str'] == "1604577768158674945"])
+    # print(tweets[0])
+    # print(df.loc[df['id_str'] == "1604577768158674945"])
 
-    print(tweet_dict["1001260139"])
+    # print(tweet_dict["1001260139"])
 
     # Sort by date
     df = df.sort_values(by=["usec"])
-    print(str(df["usec"].head(5)))
+    # print(str(df["usec"].head(5)))
 
     # Check for output sheet; create if not found
     output_sheet = get_or_create_output_sheet(file_dir, df)
-    print(output_sheet.head(5))
+    # print(output_sheet.head(5))
 
     # Fetch ID of next tweet
+    then = make_year_offset_for_now(15)
+
+    next_tweet = df.loc[df["usec"] > then.timestamp()].head(1)
+
+    next_tweet_id = next_tweet["id_str"].values[0]
+
+    print(next_tweet_id)
+
+    print(tweet_dict[next_tweet_id])
 
     # Build toot to prepare for sending
 
     # Check sheet for settings once a minute leading up to posting; do this until under a minute to posting
     # Whenever update found, update the built toot
+
+    tweet_settings = output_sheet.loc[output_sheet["id_str"] == next_tweet_id]
+
+    print(tweet_settings)
+
+    privacy = tweet_settings["privacy"].values[0]
+
+    print(privacy)
+
+    tweet_is_reply = tweet_settings["is_reply"].values[0]
+
+    if privacy.upper() == "PUBLIC":
+        visibility = "public"
+    elif privacy.upper() == "UNLISTED":
+        visibility = "unlisted"
+    elif privacy.upper() == "PRIVATE":
+        visiblity = "private"
+    elif privacy.upper() == "SKIP":
+        visibility = "skip"
+    elif tweet_is_reply:
+        visibility = os.environ["REPLY_PRIVACY"]
+    else:
+        visibility = os.environ["TWEET_PRIVACY"]
 
     # Send toot at scheduled time, go back to fetch next ID
