@@ -3,17 +3,20 @@ import os
 import datetime as dt
 import pandas as pd
 import json
+import time
 
 
 def test_post():
     token = os.environ["ACCESS_TOKEN"]
-    print(token)
+
     mastodon = Mastodon(
         access_token=token,
         api_base_url="https://botsin.space/"
     )
 
-    mastodon.status_post("This is a test post.")
+    mastodon.status_post("This is another test post.\n Can you believe it???",
+                         spoiler_text="test 4",
+                         visibility="unlisted")
 
 
 def timestamp_to_usec(timestamp):
@@ -71,7 +74,7 @@ def tweets_import(directory):
         "img2": "object",
         "img3": "object",
         "img4": "object",
-        "usec": "object"
+        "usec": "int"
     })
 
     return tweets, tweet_dict, df
@@ -80,8 +83,6 @@ def tweets_import(directory):
 def get_or_create_output_sheet(directory: str, dataframe: pd.DataFrame):
 
     files_in_dir = os.listdir(directory)
-
-    print(files_in_dir)
 
     if "output_sheet.xlsx" in files_in_dir:
         # Find the file, important it into Pandas, return the df
@@ -148,56 +149,93 @@ if __name__ == "__main__":
     archive_directory = "files/twitter 2022"
     file_dir = "files"
     tweets, tweet_dict, df = tweets_import(archive_directory)
-    # print(tweets[0])
-    # print(df.loc[df['id_str'] == "1604577768158674945"])
-
-    # print(tweet_dict["1001260139"])
 
     # Sort by date
     df = df.sort_values(by=["usec"])
-    # print(str(df["usec"].head(5)))
 
     # Check for output sheet; create if not found
     output_sheet = get_or_create_output_sheet(file_dir, df)
-    # print(output_sheet.head(5))
 
     # Fetch ID of next tweet
-    then = make_year_offset_for_now(15)
+    then = make_year_offset_for_now(int(os.environ["YEAR_OFFSET"]))
 
     next_tweet = df.loc[df["usec"] > then.timestamp()].head(1)
 
-    next_tweet_id = next_tweet["id_str"].values[0]
+    while (next_tweet.shape[0] > 0):
 
-    print(next_tweet_id)
+        next_tweet_id = next_tweet["id_str"].values[0]
 
-    print(tweet_dict[next_tweet_id])
+        # Build toot to prepare for sending
 
-    # Build toot to prepare for sending
+        # Check sheet for settings once a minute leading up to posting; do this until under a minute to posting
+        # Whenever update found, update the built toot
 
-    # Check sheet for settings once a minute leading up to posting; do this until under a minute to posting
-    # Whenever update found, update the built toot
+        time_delta = next_tweet["usec"].values[0] - then.timestamp()
 
-    tweet_settings = output_sheet.loc[output_sheet["id_str"] == next_tweet_id]
+        first_time = True
 
-    print(tweet_settings)
+        while (time_delta > 60) or first_time:
 
-    privacy = tweet_settings["privacy"].values[0]
+            output_sheet = get_or_create_output_sheet(file_dir, df)
+            tweet_settings = output_sheet.loc[output_sheet["id_str"] == next_tweet_id]
 
-    print(privacy)
+            # Get privacy preferences and set them for thr post
 
-    tweet_is_reply = tweet_settings["is_reply"].values[0]
+            privacy = tweet_settings["privacy"].values[0]
 
-    if privacy.upper() == "PUBLIC":
-        visibility = "public"
-    elif privacy.upper() == "UNLISTED":
-        visibility = "unlisted"
-    elif privacy.upper() == "PRIVATE":
-        visiblity = "private"
-    elif privacy.upper() == "SKIP":
-        visibility = "skip"
-    elif tweet_is_reply:
-        visibility = os.environ["REPLY_PRIVACY"]
-    else:
-        visibility = os.environ["TWEET_PRIVACY"]
+            tweet_is_reply = tweet_settings["is_reply"].values[0]
 
-    # Send toot at scheduled time, go back to fetch next ID
+            if privacy.upper() == "PUBLIC":
+                visibility = "public"
+            elif privacy.upper() == "UNLISTED":
+                visibility = "unlisted"
+            elif privacy.upper() == "PRIVATE":
+                visiblity = "private"
+            elif privacy.upper() == "SKIP":
+                visibility = "skip"
+            elif tweet_is_reply:
+                visibility = os.environ["REPLY_PRIVACY"]
+            else:
+                visibility = os.environ["TWEET_PRIVACY"]
+
+            # Get content warning, if one has been added, and set it for the post
+
+            if (tweet_settings["content_warning"].values[0] != "nan"):
+                spoiler = tweet_settings["content_warning"].values[0]
+            else:
+                spoiler = None
+
+            if first_time:
+                print(f"Posting in {time_delta} seconds:\n\n" +
+                      f"Status: {tweet_dict[str(next_tweet['id_str'].values[0])]['tweet']['full_text']}\n" +
+                      f"Privacy: {visibility}\n" +
+                      f"Content Warning: {spoiler}")
+
+            if time_delta > 60:
+                time.sleep(60)
+
+            # Refresh the time delta by also updating present - offset
+            then = make_year_offset_for_now(int(os.environ["YEAR_OFFSET"]))
+            time_delta = next_tweet["usec"].values[0] - then.timestamp()
+            first_time = False
+
+            # FOR TESTING - if you uncomment the below, it'll post instantly
+            # time_delta = 0
+
+        # Send toot at scheduled time, go back to fetch next ID
+        time.sleep(time_delta)
+
+        token = os.environ["ACCESS_TOKEN"]
+
+        mastodon = Mastodon(
+            access_token=token,
+            api_base_url="https://botsin.space/"
+        )
+
+        post_text = tweet_dict[next_tweet["id_str"].values[0]]["tweet"]["full_text"]
+        mastodon.status_post(post_text,
+                             visibility=visibility,
+                             spoiler_text=spoiler)
+
+        then = make_year_offset_for_now(int(os.environ["YEAR_OFFSET"]))
+        next_tweet = df.loc[df["usec"] > then.timestamp()].head(1)
