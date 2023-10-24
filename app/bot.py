@@ -19,7 +19,7 @@ def test_post():
                          visibility="unlisted")
 
 
-def timestamp_to_usec(timestamp):
+def timestamp_to_unix_seconds(timestamp):
     post_dt = dt.datetime.strptime(timestamp, "%a %b %d %H:%M:%S %z %Y")
     return post_dt.timestamp()
 
@@ -59,7 +59,7 @@ def tweets_import(directory):
                     "img2": "",
                     "img3": "",
                     "img4": "",
-                    "usec": timestamp_to_usec(tweet["tweet"]["created_at"]),
+                    "unix_seconds": timestamp_to_unix_seconds(tweet["tweet"]["created_at"]),
                     "is_reply": is_reply(tweet["tweet"])
                 }
         )
@@ -74,7 +74,7 @@ def tweets_import(directory):
         "img2": "object",
         "img3": "object",
         "img4": "object",
-        "usec": "int"
+        "unix_seconds": "int"
     })
 
     return tweets, tweet_dict, df
@@ -112,7 +112,7 @@ def get_or_create_output_sheet(directory: str, dataframe: pd.DataFrame):
             "img2": "object",
             "img3": "object",
             "img4": "object",
-            "usec": "object",
+            "unix_seconds": "object",
             "content_warning": "str",
             "img1_caption": "str",
             "img2_caption": "str",
@@ -151,7 +151,7 @@ if __name__ == "__main__":
     tweets, tweet_dict, df = tweets_import(archive_directory)
 
     # Sort by date
-    df = df.sort_values(by=["usec"])
+    df = df.sort_values(by=["unix_seconds"])
 
     # Check for output sheet; create if not found
     output_sheet = get_or_create_output_sheet(file_dir, df)
@@ -159,7 +159,7 @@ if __name__ == "__main__":
     # Fetch ID of next tweet
     then = make_year_offset_for_now(int(os.environ["YEAR_OFFSET"]))
 
-    next_tweet = df.loc[df["usec"] > then.timestamp()].head(1)
+    next_tweet = df.loc[df["unix_seconds"] > then.timestamp()].head(1)
 
     while (next_tweet.shape[0] > 0):
 
@@ -170,7 +170,7 @@ if __name__ == "__main__":
         # Check sheet for settings once a minute leading up to posting; do this until under a minute to posting
         # Whenever update found, update the built toot
 
-        time_delta = next_tweet["usec"].values[0] - then.timestamp()
+        time_delta = next_tweet["unix_seconds"].values[0] - then.timestamp()
 
         first_time = True
 
@@ -183,7 +183,7 @@ if __name__ == "__main__":
 
             privacy = tweet_settings["privacy"].values[0]
 
-            tweet_is_reply = tweet_settings["is_reply"].values[0]
+            tweet_is_reply = next_tweet["is_reply"].values[0]
 
             if privacy.upper() == "PUBLIC":
                 visibility = "public"
@@ -206,17 +206,17 @@ if __name__ == "__main__":
                 spoiler = None
 
             if first_time:
-                print(f"Posting in {time_delta} seconds:\n\n" +
+                print(f"Posting in {time_delta} seconds:\n" +
                       f"Status: {tweet_dict[str(next_tweet['id_str'].values[0])]['tweet']['full_text']}\n" +
                       f"Privacy: {visibility}\n" +
-                      f"Content Warning: {spoiler}")
+                      f"Content Warning: {spoiler}\n")
 
             if time_delta > 60:
                 time.sleep(60)
 
             # Refresh the time delta by also updating present - offset
             then = make_year_offset_for_now(int(os.environ["YEAR_OFFSET"]))
-            time_delta = next_tweet["usec"].values[0] - then.timestamp()
+            time_delta = next_tweet["unix_seconds"].values[0] - then.timestamp()
             first_time = False
 
             # FOR TESTING - if you uncomment the below, it'll post instantly
@@ -238,4 +238,4 @@ if __name__ == "__main__":
                              spoiler_text=spoiler)
 
         then = make_year_offset_for_now(int(os.environ["YEAR_OFFSET"]))
-        next_tweet = df.loc[df["usec"] > then.timestamp()].head(1)
+        next_tweet = df.loc[df["unix_seconds"] > then.timestamp()].head(1)
