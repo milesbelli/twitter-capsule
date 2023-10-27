@@ -1,0 +1,22 @@
+version: "3.7"
+
+services:
+
+  social:
+    build: ./
+    container_name: twitter_bot
+    restart: always
+    environment:
+    # Put the access token you get when you set up your app here (no quotes)
+    - ACCESS_TOKEN=
+    # Define privacy for tweets and replies independently. Options are public, unlisted, private, skip
+    - TWEET_PRIVACY=unlisted
+    - REPLY_PRIVACY=private
+    # Set the offset in years that you want to go back. Must be integer greater than 0
+    - YEAR_OFFSET=15
+    # This is so the output logs work in Docker
+    - PYTHONUNBUFFERED=1
+    volumes:
+    # Left hand side is directory outside the container, where
+    # the output editor file and twitter archive will live
+      - ./files/:/twitterbot/files/
