@@ -14,6 +14,8 @@ services:
     - REPLY_PRIVACY=private
     # Set the offset in years that you want to go back. Must be integer greater than 0
     - YEAR_OFFSET=15
+    # What's the name of the archive folder inside of the files directory
+    - ARCHIVE_FOLDER=
     # This is so the output logs work in Docker
     - PYTHONUNBUFFERED=1
     volumes:

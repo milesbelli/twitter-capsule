@@ -146,8 +146,8 @@ if __name__ == "__main__":
     # test_post()
 
     # Import the tweets file to json and pandas data frame
-    archive_directory = "files/twitter 2022"
     file_dir = "files"
+    archive_directory = f"{file_dir}/{os.environ['ARCHIVE_FOLDER']}"
     tweets, tweet_dict, df = tweets_import(archive_directory)
 
     # Sort by date
@@ -227,15 +227,16 @@ if __name__ == "__main__":
 
         token = os.environ["ACCESS_TOKEN"]
 
-        mastodon = Mastodon(
-            access_token=token,
-            api_base_url="https://botsin.space/"
-        )
+        if visibility != "skip":
+            mastodon = Mastodon(
+                access_token=token,
+                api_base_url="https://botsin.space/"
+            )
 
-        post_text = tweet_dict[next_tweet["id_str"].values[0]]["tweet"]["full_text"]
-        mastodon.status_post(post_text,
-                             visibility=visibility,
-                             spoiler_text=spoiler)
+            post_text = tweet_dict[next_tweet["id_str"].values[0]]["tweet"]["full_text"]
+            mastodon.status_post(post_text,
+                                 visibility=visibility,
+                                 spoiler_text=spoiler)
 
         then = make_year_offset_for_now(int(os.environ["YEAR_OFFSET"]))
         next_tweet = df.loc[df["unix_seconds"] > then.timestamp()].head(1)
