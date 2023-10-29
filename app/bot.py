@@ -183,7 +183,7 @@ def set_profile(mastodon, then: dt.datetime, old_profile):
 
     if (disp_name != old_profile["display_name"]) or \
        (description != old_profile["source"]["note"]) or \
-       (new_day != old_day) or (new_year != old_year):
+       (new_day != old_day) or (new_year != str(old_year)):
 
         me = mastodon.account_update_credentials(
             display_name=disp_name,
