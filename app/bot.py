@@ -4,6 +4,7 @@ import datetime as dt
 import pandas as pd
 import json
 import time
+from html import unescape
 
 
 def test_post():
@@ -142,12 +143,72 @@ def make_year_offset_for_now(offset):
     return time_then
 
 
+def get_profile(mastodon):
+    return mastodon.me()
+
+
+def set_profile(mastodon, then: dt.datetime, old_profile):
+    disp_name = os.environ["PROFILE_NAME"].replace("%Y", str(then.year))
+    description = os.environ["PROFILE_DESC"].replace("%Y", str(then.year))
+
+    all_fields = old_profile["source"]["fields"]
+    field_list = []
+    need_to_add_year = True
+    need_to_add_day = True
+
+    old_year = old_day = ""
+
+    new_year = str(then.year)
+    new_day = then.strftime("%A")
+
+    # Go through all fields, update the ones which are automatic
+    for field in all_fields:
+        if field["name"] == "The year is":
+            old_year = field["value"]
+            field_list.append((field["name"], new_year))
+            need_to_add_year = False
+        elif field["name"] == "The day is":
+            old_day = field["value"]
+            field_list.append((field["name"], new_day))
+            need_to_add_day = False
+        else:
+            field_list.append((field["name"], field["value"]))
+
+    # Fields weren't there? Add them if they'll fit!
+    if len(field_list) < 4 and need_to_add_year:
+        field_list.append(("The year is", new_year))
+
+    if len(field_list) < 4 and need_to_add_day:
+        field_list.append(("The day is", new_day))
+
+    if (disp_name != old_profile["display_name"]) or \
+       (description != old_profile["source"]["note"]) or \
+       (new_day != old_day) or (new_year != old_year):
+
+        me = mastodon.account_update_credentials(
+            display_name=disp_name,
+            note=description,
+            fields=field_list
+        )
+        return me
+
+    return old_profile
+
+
 if __name__ == "__main__":
+
+    # Set up Mastodon account credentials
+    token = os.environ["ACCESS_TOKEN"]
+    mastodon = Mastodon(
+            access_token=token,
+            api_base_url="https://botsin.space/"
+        )
+
     # test_post()
 
     # Import the tweets file to json and pandas data frame
-    archive_directory = "files/twitter 2022"
     file_dir = "files"
+    archive_directory = f"{file_dir}/{os.environ['ARCHIVE_FOLDER']}"
     tweets, tweet_dict, df = tweets_import(archive_directory)
 
     # Sort by date
@@ -160,6 +221,8 @@ if __name__ == "__main__":
     then = make_year_offset_for_now(int(os.environ["YEAR_OFFSET"]))
 
     next_tweet = df.loc[df["unix_seconds"] > then.timestamp()].head(1)
+
+    check_profile = 0
 
     while (next_tweet.shape[0] > 0):
 
@@ -176,10 +239,21 @@ if __name__ == "__main__":
 
         while (time_delta > 60) or first_time:
 
+            # Every ten iterations (minutes), check the profile and maybe update
+            if check_profile == 10:
+
+                profile = get_profile(mastodon)
+                profile = set_profile(mastodon, then, profile)
+                check_profile = 0
+
+            else:
+                check_profile += 1
+
+            # The output sheet is used to modify the output prior to posting
             output_sheet = get_or_create_output_sheet(file_dir, df)
             tweet_settings = output_sheet.loc[output_sheet["id_str"] == next_tweet_id]
 
-            # Get privacy preferences and set them for thr post
+            # Get privacy preferences and set them for the post
 
             privacy = tweet_settings["privacy"].values[0]
 
@@ -225,17 +299,12 @@ if __name__ == "__main__":
         # Send toot at scheduled time, go back to fetch next ID
         time.sleep(time_delta)
 
-        token = os.environ["ACCESS_TOKEN"]
+        if visibility != "skip":
 
-        mastodon = Mastodon(
-            access_token=token,
-            api_base_url="https://botsin.space/"
-        )
-
-        post_text = tweet_dict[next_tweet["id_str"].values[0]]["tweet"]["full_text"]
-        mastodon.status_post(post_text,
-                             visibility=visibility,
-                             spoiler_text=spoiler)
+            post_text = tweet_dict[next_tweet["id_str"].values[0]]["tweet"]["full_text"]
+            mastodon.status_post(post_text,
+                                 visibility=visibility,
+                                 spoiler_text=spoiler)
 
         then = make_year_offset_for_now(int(os.environ["YEAR_OFFSET"]))
         next_tweet = df.loc[df["unix_seconds"] > then.timestamp()].head(1)

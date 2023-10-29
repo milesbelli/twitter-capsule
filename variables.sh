@@ -5,3 +5,8 @@ export TWEET_PRIVACY=unlisted
 export REPLY_PRIVACY=private
 # Set the offset in years that you want to go back. Must be integer greater than 0
 export YEAR_OFFSET=15
+# What's the name of the archive folder inside of the files directory
+export ARCHIVE_FOLDER=
+# Set account info. Use %Y to specify year.
+export PROFILE_NAME=""
+export PROFILE_DESC=""
