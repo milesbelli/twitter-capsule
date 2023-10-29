@@ -16,6 +16,9 @@ services:
     - YEAR_OFFSET=15
     # What's the name of the archive folder inside of the files directory
     - ARCHIVE_FOLDER=
+    # Set account info. Use %Y to specify year.
+    - PROFILE_NAME=
+    - PROFILE_DESC=
     # This is so the output logs work in Docker
     - PYTHONUNBUFFERED=1
     volumes:

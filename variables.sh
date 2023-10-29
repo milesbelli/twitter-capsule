@@ -7,3 +7,6 @@ export REPLY_PRIVACY=private
 export YEAR_OFFSET=15
 # What's the name of the archive folder inside of the files directory
 export ARCHIVE_FOLDER=
+# Set account info. Use %Y to specify year.
+export PROFILE_NAME=""
+export PROFILE_DESC=""
