@@ -20,6 +20,8 @@ services:
     # Set account info. Use %Y to specify year.
     - PROFILE_NAME=
     - PROFILE_DESC=
+    # Set timezone you want profile to be associated with
+    - LOCAL_TZ=America/New_York
     # This is so the output logs work in Docker
     - PYTHONUNBUFFERED=1
     volumes:

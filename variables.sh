@@ -10,3 +10,5 @@ export ARCHIVE_FOLDER=
 # Set account info. Use %Y to specify year.
 export PROFILE_NAME=""
 export PROFILE_DESC=""
+# Set timezone you want profile to be associated with
+export LOCAL_TZ="America/New_York"
