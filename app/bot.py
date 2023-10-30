@@ -4,7 +4,7 @@ import datetime as dt
 import pandas as pd
 import json
 import time
-from html import unescape
+import pytz
 
 
 def test_post():
@@ -195,6 +195,11 @@ def set_profile(mastodon, then: dt.datetime, old_profile):
     return old_profile
 
 
+def get_local_then(then: dt.datetime, tz_name: str):
+    tzinfo = pytz.timezone(tz_name)
+    return then.astimezone(tz=tzinfo)
+
+
 if __name__ == "__main__":
 
     # Set up Mastodon account credentials
@@ -242,8 +247,9 @@ if __name__ == "__main__":
             # Every ten iterations (minutes), check the profile and maybe update
             if check_profile == 10:
 
+                then_local = get_local_then(then, os.environ["LOCAL_TZ"])
                 profile = get_profile(mastodon)
-                profile = set_profile(mastodon, then, profile)
+                profile = set_profile(mastodon, then_local, profile)
                 check_profile = 0
 
             else:
