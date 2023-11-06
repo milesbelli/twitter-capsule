@@ -185,12 +185,16 @@ def set_profile(mastodon, then: dt.datetime, old_profile):
        (description != old_profile["source"]["note"]) or \
        (new_day != old_day) or (new_year != str(old_year)):
 
-        me = mastodon.account_update_credentials(
-            display_name=disp_name,
-            note=description,
-            fields=field_list
-        )
-        return me
+        try:
+            me = mastodon.account_update_credentials(
+                display_name=disp_name,
+                note=description,
+                fields=field_list
+            )
+            return me
+
+        except MastodonGatewayTimeoutError:
+            print("Timed out while trying to update profile. Better luck next time.")
 
     return old_profile
 
@@ -307,10 +311,19 @@ if __name__ == "__main__":
 
         if visibility != "skip":
 
-            post_text = tweet_dict[next_tweet["id_str"].values[0]]["tweet"]["full_text"]
-            mastodon.status_post(post_text,
-                                 visibility=visibility,
-                                 spoiler_text=spoiler)
+            msg_sent = False
+            while not msg_sent:
+
+                try:
+                    post_text = tweet_dict[next_tweet["id_str"].values[0]]["tweet"]["full_text"]
+                    mastodon.status_post(post_text,
+                                         visibility=visibility,
+                                         spoiler_text=spoiler)
+
+                    msg_sent = True
+
+                except MastodonGatewayTimeoutError:
+                    msg_sent = False
 
         then = make_year_offset_for_now(int(os.environ["YEAR_OFFSET"]))
         next_tweet = df.loc[df["unix_seconds"] > then.timestamp()].head(1)
