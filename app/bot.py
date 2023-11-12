@@ -232,6 +232,7 @@ if __name__ == "__main__":
     next_tweet = df.loc[df["unix_seconds"] > then.timestamp()].head(1)
 
     check_profile = 0
+    profile = get_profile(mastodon)
 
     while (next_tweet.shape[0] > 0):
 
@@ -248,16 +249,18 @@ if __name__ == "__main__":
 
         while (time_delta > 60) or first_time:
 
-            # Every ten iterations (minutes), check the profile and maybe update
+            # Every ten iterations (minutes), check the profile for changes
             if check_profile == 10:
 
                 then_local = get_local_then(then, os.environ["LOCAL_TZ"])
                 profile = get_profile(mastodon)
-                profile = set_profile(mastodon, then_local, profile)
                 check_profile = 0
 
             else:
                 check_profile += 1
+
+            then_local = get_local_then(then, os.environ["LOCAL_TZ"])
+            profile = set_profile(mastodon, then_local, profile)
 
             # The output sheet is used to modify the output prior to posting
             output_sheet = get_or_create_output_sheet(file_dir, df)
@@ -307,6 +310,7 @@ if __name__ == "__main__":
             # time_delta = 0
 
         # Send toot at scheduled time, go back to fetch next ID
+        time_delta = time_delta if time_delta >= 0 else 0
         time.sleep(time_delta)
 
         if visibility != "skip":
