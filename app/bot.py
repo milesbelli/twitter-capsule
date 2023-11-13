@@ -250,7 +250,7 @@ if __name__ == "__main__":
         while (time_delta > 60) or first_time:
 
             # Every ten iterations (minutes), check the profile for changes
-            if check_profile == 10:
+            if check_profile == 20:
 
                 then_local = get_local_then(then, os.environ["LOCAL_TZ"])
                 profile = get_profile(mastodon)
