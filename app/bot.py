@@ -193,8 +193,11 @@ def set_profile(mastodon, then: dt.datetime, old_profile):
             )
             return me
 
-        except MastodonGatewayTimeoutError:
+        except mastodon.errors.MastodonGatewayTimeoutError:
             print("Timed out while trying to update profile. Better luck next time.")
+
+        except mastodon.errors.MastodonInternalServerError:
+            print("Internal server error. Skipping.")
 
     return old_profile
 
@@ -250,7 +253,7 @@ if __name__ == "__main__":
         while (time_delta > 60) or first_time:
 
             # Every ten iterations (minutes), check the profile for changes
-            if check_profile == 10:
+            if check_profile == 20:
 
                 then_local = get_local_then(then, os.environ["LOCAL_TZ"])
                 profile = get_profile(mastodon)
@@ -326,8 +329,13 @@ if __name__ == "__main__":
 
                     msg_sent = True
 
-                except MastodonGatewayTimeoutError:
+                except mastodon.errors.MastodonGatewayTimeoutError:
                     msg_sent = False
+                    print("Timed out! Retrying...")
+
+                except mastodon.errors.MastodonInternalServerError:
+                    msg_sent = False
+                    print("Internal server error! Retrying...")
 
         then = make_year_offset_for_now(int(os.environ["YEAR_OFFSET"]))
         next_tweet = df.loc[df["unix_seconds"] > then.timestamp()].head(1)
