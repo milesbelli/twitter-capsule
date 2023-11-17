@@ -193,10 +193,10 @@ def set_profile(mastodon, then: dt.datetime, old_profile):
             )
             return me
 
-        except MastodonGatewayTimeoutError:
+        except mastodon.errors.MastodonGatewayTimeoutError:
             print("Timed out while trying to update profile. Better luck next time.")
 
-        except MastodonInternalServerError:
+        except mastodon.errors.MastodonInternalServerError:
             print("Internal server error. Skipping.")
 
     return old_profile
@@ -329,11 +329,11 @@ if __name__ == "__main__":
 
                     msg_sent = True
 
-                except MastodonGatewayTimeoutError:
+                except mastodon.errors.MastodonGatewayTimeoutError:
                     msg_sent = False
                     print("Timed out! Retrying...")
 
-                except MastodonInternalServerError:
+                except mastodon.errors.MastodonInternalServerError:
                     msg_sent = False
                     print("Internal server error! Retrying...")
 
