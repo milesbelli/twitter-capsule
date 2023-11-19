@@ -191,6 +191,7 @@ def set_profile(mastodon, then: dt.datetime, old_profile):
                 note=description,
                 fields=field_list
             )
+            print(f"Profile updated at {dt.datetime.now()}")
             return me
 
         except mastodon.errors.MastodonGatewayTimeoutError:
@@ -296,7 +297,7 @@ if __name__ == "__main__":
                 spoiler = None
 
             if first_time:
-                print(f"Posting in {time_delta} seconds:\n" +
+                print(f"Posting at {dt.datetime.now() + dt.timedelta(seconds=time_delta)}:\n" +
                       f"Status: {tweet_dict[str(next_tweet['id_str'].values[0])]['tweet']['full_text']}\n" +
                       f"Privacy: {visibility}\n" +
                       f"Content Warning: {spoiler}\n")
