@@ -147,6 +147,7 @@ def get_profile(mastodon):
     return mastodon.me()
 
 
+# Set profile only updates if it detects a change
 def set_profile(mastodon, then: dt.datetime, old_profile):
     disp_name = os.environ["PROFILE_NAME"].replace("%Y", str(then.year))
     description = os.environ["PROFILE_DESC"].replace("%Y", str(then.year))
@@ -235,8 +236,15 @@ if __name__ == "__main__":
 
     next_tweet = df.loc[df["unix_seconds"] > then.timestamp()].head(1)
 
+    # Periodically download an updated profile
     check_profile = 0
     profile = get_profile(mastodon)
+
+    check_file = 60
+    first_time = True
+
+    # Test line: if you want to force it to post within 5 seconds, uncomment below
+    # next_tweet["unix_seconds"].values[0] = then.timestamp() + 5
 
     while (next_tweet.shape[0] > 0):
 
@@ -249,22 +257,23 @@ if __name__ == "__main__":
 
         time_delta = next_tweet["unix_seconds"].values[0] - then.timestamp()
 
-        first_time = True
-
-        while (time_delta > 60) or first_time:
-
-            # Every ten iterations (minutes), check the profile for changes
-            if check_profile == 20:
-
-                then_local = get_local_then(then, os.environ["LOCAL_TZ"])
-                profile = get_profile(mastodon)
-                check_profile = 0
-
-            else:
-                check_profile += 1
+        # Every 1200 iterations (seconds, roughly), check the profile for changes
+        if check_profile == 1200:
 
             then_local = get_local_then(then, os.environ["LOCAL_TZ"])
-            profile = set_profile(mastodon, then_local, profile)
+            profile = get_profile(mastodon)
+            check_profile = 0
+
+        else:
+            check_profile += 1
+
+        then_local = get_local_then(then, os.environ["LOCAL_TZ"])
+        profile = set_profile(mastodon, then_local, profile)
+
+        if ((time_delta > 60) or first_time) and\
+            check_file == 60:
+
+            check_file = 0
 
             # The output sheet is used to modify the output prior to posting
             output_sheet = get_or_create_output_sheet(file_dir, df)
@@ -297,46 +306,49 @@ if __name__ == "__main__":
                 spoiler = None
 
             if first_time:
-                print(f"Posting at {dt.datetime.now() + dt.timedelta(seconds=time_delta)}:\n" +
+                print(f"Next tweet at {dt.datetime.now() + dt.timedelta(seconds=time_delta)}:\n" +
                       f"Status: {tweet_dict[str(next_tweet['id_str'].values[0])]['tweet']['full_text']}\n" +
                       f"Privacy: {visibility}\n" +
                       f"Content Warning: {spoiler}\n")
 
-            if time_delta > 60:
-                time.sleep(60)
-
-            # Refresh the time delta by also updating present - offset
-            then = make_year_offset_for_now(int(os.environ["YEAR_OFFSET"]))
-            time_delta = next_tweet["unix_seconds"].values[0] - then.timestamp()
             first_time = False
-
-            # FOR TESTING - if you uncomment the below, it'll post instantly
-            # time_delta = 0
+            
+        check_file += 1
 
         # Send toot at scheduled time, go back to fetch next ID
-        time_delta = time_delta if time_delta >= 0 else 0
-        time.sleep(time_delta)
+        if time_delta < 1:
+            if visibility != "skip":
 
-        if visibility != "skip":
+                msg_sent = False
+                while not msg_sent:
 
-            msg_sent = False
-            while not msg_sent:
+                    try:
+                        post_text = tweet_dict[next_tweet["id_str"].values[0]]["tweet"]["full_text"]
+                        mastodon.status_post(post_text,
+                                            visibility=visibility,
+                                            spoiler_text=spoiler)
 
-                try:
-                    post_text = tweet_dict[next_tweet["id_str"].values[0]]["tweet"]["full_text"]
-                    mastodon.status_post(post_text,
-                                         visibility=visibility,
-                                         spoiler_text=spoiler)
+                        msg_sent = True
 
-                    msg_sent = True
+                    except mastodon.errors.MastodonGatewayTimeoutError:
+                        msg_sent = False
+                        print("Timed out! Retrying...")
 
-                except mastodon.errors.MastodonGatewayTimeoutError:
-                    msg_sent = False
-                    print("Timed out! Retrying...")
+                    except mastodon.errors.MastodonInternalServerError:
+                        msg_sent = False
+                        print("Internal server error! Retrying...")
 
-                except mastodon.errors.MastodonInternalServerError:
-                    msg_sent = False
-                    print("Internal server error! Retrying...")
+            # Get next tweet, set to first time
+            then = make_year_offset_for_now(int(os.environ["YEAR_OFFSET"]))
+            next_tweet = df.loc[df["unix_seconds"] > then.timestamp()].head(1)
+            first_time = True
+            
 
+        time.sleep(1)
+
+        # Refresh the time delta by also updating present - offset
         then = make_year_offset_for_now(int(os.environ["YEAR_OFFSET"]))
-        next_tweet = df.loc[df["unix_seconds"] > then.timestamp()].head(1)
+        time_delta = next_tweet["unix_seconds"].values[0] - then.timestamp()
+        time_delta = time_delta if time_delta >= 0 else 0
+
+        
