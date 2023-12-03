@@ -144,7 +144,17 @@ def make_year_offset_for_now(offset):
 
 
 def get_profile(mastodon):
-    return mastodon.me()
+    while True:
+        try:
+            return mastodon.me()
+        
+        except mastodon.errors.MastodonGatewayTimeoutError:
+            print("Failed to get profile. Retrying...")
+            time.sleep(1)
+
+        except mastodon.errors.MastodonInternalServerError:
+            print("Mastodon had an internal server error while trying to get profile. Retrying...")
+            time.sleep(1)
 
 
 # Set profile only updates if it detects a change
@@ -270,8 +280,7 @@ if __name__ == "__main__":
         then_local = get_local_then(then, os.environ["LOCAL_TZ"])
         profile = set_profile(mastodon, then_local, profile)
 
-        if ((time_delta > 60) or first_time) and\
-            check_file == 60:
+        if ((time_delta > 60) and (check_file == 60)) or first_time:
 
             check_file = 0
 
@@ -311,7 +320,7 @@ if __name__ == "__main__":
                       f"Privacy: {visibility}\n" +
                       f"Content Warning: {spoiler}\n")
 
-            first_time = False
+                first_time = False
             
         check_file += 1
 
@@ -339,9 +348,11 @@ if __name__ == "__main__":
                         print("Internal server error! Retrying...")
 
             # Get next tweet, set to first time
+            print(f"Processed at {dt.datetime.now()}")
             then = make_year_offset_for_now(int(os.environ["YEAR_OFFSET"]))
             next_tweet = df.loc[df["unix_seconds"] > then.timestamp()].head(1)
             first_time = True
+            check_file = 0
             
 
         time.sleep(1)
