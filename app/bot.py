@@ -1,4 +1,5 @@
 from mastodon import Mastodon
+from mastodon import errors
 import os
 import datetime as dt
 import pandas as pd
@@ -148,11 +149,11 @@ def get_profile(mastodon):
         try:
             return mastodon.me()
         
-        except mastodon.errors.MastodonGatewayTimeoutError:
+        except errors.MastodonGatewayTimeoutError:
             print("Failed to get profile. Retrying...")
             time.sleep(1)
 
-        except mastodon.errors.MastodonInternalServerError:
+        except errors.MastodonInternalServerError:
             print("Mastodon had an internal server error while trying to get profile. Retrying...")
             time.sleep(1)
 
@@ -205,10 +206,10 @@ def set_profile(mastodon, then: dt.datetime, old_profile):
             print(f"Profile updated at {dt.datetime.now()}")
             return me
 
-        except mastodon.errors.MastodonGatewayTimeoutError:
+        except errors.MastodonGatewayTimeoutError:
             print("Timed out while trying to update profile. Better luck next time.")
 
-        except mastodon.errors.MastodonInternalServerError:
+        except errors.MastodonInternalServerError:
             print("Internal server error. Skipping.")
 
     return old_profile
@@ -217,6 +218,15 @@ def set_profile(mastodon, then: dt.datetime, old_profile):
 def get_local_then(then: dt.datetime, tz_name: str):
     tzinfo = pytz.timezone(tz_name)
     return then.astimezone(tz=tzinfo)
+
+
+def get_previous_posts(directory: str):
+    previous_post_dict = {}
+    return previous_post_dict
+
+
+def write_previous_posts(directory: str):
+    pass
 
 
 if __name__ == "__main__":
@@ -339,11 +349,11 @@ if __name__ == "__main__":
 
                         msg_sent = True
 
-                    except mastodon.errors.MastodonGatewayTimeoutError:
+                    except errors.MastodonGatewayTimeoutError:
                         msg_sent = False
                         print("Timed out! Retrying...")
 
-                    except mastodon.errors.MastodonInternalServerError:
+                    except errors.MastodonInternalServerError:
                         msg_sent = False
                         print("Internal server error! Retrying...")
 
