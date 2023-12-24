@@ -157,6 +157,10 @@ def get_profile(mastodon):
             print("Mastodon had an internal server error while trying to get profile. Retrying...")
             time.sleep(1)
 
+        except errors.MastodonBadGatewayError:
+            print("Encountered a bad gateway error from the server. Retrying...")
+            time.sleep(1)
+
 
 # Set profile only updates if it detects a change
 def set_profile(mastodon, then: dt.datetime, old_profile):
@@ -211,6 +215,9 @@ def set_profile(mastodon, then: dt.datetime, old_profile):
 
         except errors.MastodonInternalServerError:
             print("Internal server error. Skipping.")
+
+        except errors.MastodonBadGatewayError:
+            print("Encountered a bad gateway error from the server. Try again later.")
 
     return old_profile
 
@@ -356,6 +363,10 @@ if __name__ == "__main__":
                     except errors.MastodonInternalServerError:
                         msg_sent = False
                         print("Internal server error! Retrying...")
+
+                    except errors.MastodonBadGatewayError:
+                        msg_sent = False
+                        print("Encountered a bad gateway error from the server. Retrying...")
 
             # Get next tweet, set to first time
             print(f"Processed at {dt.datetime.now()}")
