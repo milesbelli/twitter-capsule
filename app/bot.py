@@ -150,15 +150,15 @@ def get_profile(mastodon):
             return mastodon.me()
         
         except errors.MastodonGatewayTimeoutError:
-            print("Failed to get profile. Retrying...")
+            print(f"[{dt.datetime.now()}] Failed to get profile. Retrying...")
             time.sleep(1)
 
         except errors.MastodonInternalServerError:
-            print("Mastodon had an internal server error while trying to get profile. Retrying...")
+            print(f"[{dt.datetime.now()}] Mastodon had an internal server error while trying to get profile. Retrying...")
             time.sleep(1)
 
         except errors.MastodonBadGatewayError:
-            print("Encountered a bad gateway error from the server. Retrying...")
+            print(f"[{dt.datetime.now()}] Encountered a bad gateway error from the server. Retrying...")
             time.sleep(1)
 
 
@@ -211,13 +211,13 @@ def set_profile(mastodon, then: dt.datetime, old_profile):
             return me
 
         except errors.MastodonGatewayTimeoutError:
-            print("Timed out while trying to update profile. Better luck next time.")
+            print(f"[{dt.datetime.now()}] Timed out while trying to update profile. Better luck next time.")
 
         except errors.MastodonInternalServerError:
-            print("Internal server error. Skipping.")
+            print(f"[{dt.datetime.now()}] Internal server error. Skipping.")
 
         except errors.MastodonBadGatewayError:
-            print("Encountered a bad gateway error from the server. Try again later.")
+            print(f"[{dt.datetime.now()}] Encountered a bad gateway error from the server. Try again later.")
 
     return old_profile
 
@@ -228,12 +228,21 @@ def get_local_then(then: dt.datetime, tz_name: str):
 
 
 def get_previous_posts(directory: str):
-    previous_post_dict = {}
+    files_in_dir = os.listdir(directory)
+    if "posts.json" in files_in_dir:
+        with open(f"{directory}/posts.json") as postfile:
+            post_raw = postfile.read()
+            previous_post_dict = json.loads(post_raw)
+    else:
+        previous_post_dict = {}
     return previous_post_dict
 
 
-def write_previous_posts(directory: str):
-    pass
+def write_previous_posts(directory: str, posts: dict):
+    with open(f"{directory}/posts.json", "w") as postfile:
+        json.dump(posts, postfile)
+    
+    return posts
 
 
 if __name__ == "__main__":
@@ -267,8 +276,12 @@ if __name__ == "__main__":
     check_profile = 0
     profile = get_profile(mastodon)
 
+    # Setting first time variables
     check_file = 60
     first_time = True
+
+    # Get previous post dict
+    posted = get_previous_posts(file_dir)
 
     # Test line: if you want to force it to post within 5 seconds, uncomment below
     # next_tweet["unix_seconds"].values[0] = then.timestamp() + 5
@@ -332,10 +345,11 @@ if __name__ == "__main__":
                 spoiler = None
 
             if first_time:
-                print(f"Next tweet at {dt.datetime.now() + dt.timedelta(seconds=time_delta)}:\n" +
+                print(f"[{dt.datetime.now()}] " +
+                    f"Next tweet at {dt.datetime.now() + dt.timedelta(seconds=time_delta)}:\n" +
                       f"Status: {tweet_dict[str(next_tweet['id_str'].values[0])]['tweet']['full_text']}\n" +
                       f"Privacy: {visibility}\n" +
-                      f"Content Warning: {spoiler}\n")
+                      f"Content Warning: {spoiler}")
 
                 first_time = False
             
@@ -350,23 +364,29 @@ if __name__ == "__main__":
 
                     try:
                         post_text = tweet_dict[next_tweet["id_str"].values[0]]["tweet"]["full_text"]
-                        mastodon.status_post(post_text,
-                                            visibility=visibility,
-                                            spoiler_text=spoiler)
+                        response = mastodon.status_post(post_text,
+                                                        visibility=visibility,
+                                                        spoiler_text=spoiler)
 
                         msg_sent = True
+                        posted[next_tweet_id] = response["id"]
 
                     except errors.MastodonGatewayTimeoutError:
                         msg_sent = False
-                        print("Timed out! Retrying...")
+                        print(f"[{dt.datetime.now()}] Timed out! Retrying...")
 
                     except errors.MastodonInternalServerError:
                         msg_sent = False
-                        print("Internal server error! Retrying...")
+                        print(f"[{dt.datetime.now()}] Internal server error! Retrying...")
 
                     except errors.MastodonBadGatewayError:
                         msg_sent = False
-                        print("Encountered a bad gateway error from the server. Retrying...")
+                        print(f"[{dt.datetime.now()}] Encountered a bad gateway error from the server. Retrying...")
+
+            else:
+                posted[next_tweet_id] = None
+
+            write_previous_posts(file_dir, posted)
 
             # Get next tweet, set to first time
             print(f"Processed at {dt.datetime.now()}")
