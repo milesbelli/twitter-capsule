@@ -34,6 +34,36 @@ def is_reply(tweet: dict):
         return False
 
 
+def get_media(tweet: dict, position: int):
+    # Ensure there is an extended entities structure
+    if tweet["tweet"].get("entities"):
+        
+        # Ensure media is present
+        if tweet["tweet"]["entities"].get("media"):
+            
+            # Media structure is where we'll pull IDs from
+            media = tweet["tweet"]["extended_entities"]["media"] if \
+                 tweet["tweet"].get("extended_entities") else tweet["tweet"]["entities"]["media"]
+
+            # Make sure there's even something at this position
+            if len(media) >= (position + 1):
+
+                # Use media url as a proxy for ID
+                # The names of images in the archive contain the ID
+                media_url = media[position]["media_url"]
+
+                # The last part is what we're interested in
+                postfix = media_url.split("/")[-1]
+
+                # The tweet ID is also used for thre filename in the archive
+                prefix = tweet["tweet"]["id_str"]
+
+                return f"{prefix}-{postfix}"
+    
+    # If any of the above checks failed there is no image, so return an empty string
+    return ""
+
+
 def tweets_import(directory):
     # Open the tweets.js file and parse it correctly
     rawfile = open(f"{directory}/data/tweets.js")
@@ -57,10 +87,10 @@ def tweets_import(directory):
                     "id_str": tweet["tweet"]["id_str"],
                     "created_at": tweet["tweet"]["created_at"],
                     "full_text": tweet["tweet"]["full_text"],
-                    "img1": "",
-                    "img2": "",
-                    "img3": "",
-                    "img4": "",
+                    "img1": get_media(tweet, 0),
+                    "img2": get_media(tweet, 1),
+                    "img3": get_media(tweet, 2),
+                    "img4": get_media(tweet, 3),
                     "unix_seconds": timestamp_to_unix_seconds(tweet["tweet"]["created_at"]),
                     "is_reply": is_reply(tweet["tweet"])
                 }
@@ -346,7 +376,7 @@ if __name__ == "__main__":
 
             if first_time:
                 print(f"[{dt.datetime.now()}] " +
-                    f"Next tweet at {dt.datetime.now() + dt.timedelta(seconds=time_delta)}:\n" +
+                      f"Next tweet at {dt.datetime.now() + dt.timedelta(seconds=time_delta)}:\n" +
                       f"Status: {tweet_dict[str(next_tweet['id_str'].values[0])]['tweet']['full_text']}\n" +
                       f"Privacy: {visibility}\n" +
                       f"Content Warning: {spoiler}")
