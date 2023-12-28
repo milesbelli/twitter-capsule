@@ -6,6 +6,7 @@ import pandas as pd
 import json
 import time
 import pytz
+import html
 
 
 def test_post():
@@ -86,7 +87,7 @@ def tweets_import(directory):
                 {
                     "id_str": tweet["tweet"]["id_str"],
                     "created_at": tweet["tweet"]["created_at"],
-                    "full_text": tweet["tweet"]["full_text"],
+                    "full_text": html.unescape(tweet["tweet"]["full_text"]),
                     "img1": get_media(tweet, 0),
                     "img2": get_media(tweet, 1),
                     "img3": get_media(tweet, 2),
@@ -377,7 +378,7 @@ if __name__ == "__main__":
             if first_time:
                 print(f"[{dt.datetime.now()}] " +
                       f"Next tweet at {dt.datetime.now() + dt.timedelta(seconds=time_delta)}:\n" +
-                      f"Status: {tweet_dict[str(next_tweet['id_str'].values[0])]['tweet']['full_text']}\n" +
+                      f"Status: {html.unescape(tweet_dict[str(next_tweet['id_str'].values[0])]['tweet']['full_text'])}\n" +
                       f"Privacy: {visibility}\n" +
                       f"Content Warning: {spoiler}")
 
@@ -393,7 +394,7 @@ if __name__ == "__main__":
                 while not msg_sent:
 
                     try:
-                        post_text = tweet_dict[next_tweet["id_str"].values[0]]["tweet"]["full_text"]
+                        post_text = html.unescape(tweet_dict[next_tweet["id_str"].values[0]]["tweet"]["full_text"])
                         response = mastodon.status_post(post_text,
                                                         visibility=visibility,
                                                         spoiler_text=spoiler)
