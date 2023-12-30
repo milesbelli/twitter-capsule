@@ -258,6 +258,17 @@ def get_local_then(then: dt.datetime, tz_name: str):
     return then.astimezone(tz=tzinfo)
 
 
+def get_reply_to(tweet: dict, posts: dict):
+    reply_id = tweet["tweet"].get("in_reply_to_status_id_str")
+
+    if reply_id:
+        mastodon_id = posts.get(reply_id)
+    else:
+        mastodon_id = None
+
+    return mastodon_id
+
+
 def get_previous_posts(directory: str):
     files_in_dir = os.listdir(directory)
     if "posts.json" in files_in_dir:
@@ -339,7 +350,7 @@ if __name__ == "__main__":
             check_profile += 1
 
         then_local = get_local_then(then, os.environ["LOCAL_TZ"])
-        profile = set_profile(mastodon, then_local, profile)
+        # profile = set_profile(mastodon, then_local, profile)
 
         if ((time_delta > 60) and (check_file == 60)) or first_time:
 
@@ -355,6 +366,8 @@ if __name__ == "__main__":
 
             tweet_is_reply = next_tweet["is_reply"].values[0]
 
+            reply_to = get_reply_to(tweet_dict[next_tweet["id_str"].values[0]], posted)
+
             if privacy.upper() == "PUBLIC":
                 visibility = "public"
             elif privacy.upper() == "UNLISTED":
@@ -363,6 +376,9 @@ if __name__ == "__main__":
                 visiblity = "private"
             elif privacy.upper() == "SKIP":
                 visibility = "skip"
+            # Treat tweet threads (self replies) like regular tweets
+            elif reply_to:
+                visibility = os.environ["TWEET_PRIVACY"]
             elif tweet_is_reply:
                 visibility = os.environ["REPLY_PRIVACY"]
             else:
@@ -397,7 +413,8 @@ if __name__ == "__main__":
                         post_text = html.unescape(tweet_dict[next_tweet["id_str"].values[0]]["tweet"]["full_text"])
                         response = mastodon.status_post(post_text,
                                                         visibility=visibility,
-                                                        spoiler_text=spoiler)
+                                                        spoiler_text=spoiler,
+                                                        in_reply_to_id=reply_to)
 
                         msg_sent = True
                         posted[next_tweet_id] = response["id"]
@@ -433,5 +450,3 @@ if __name__ == "__main__":
         then = make_year_offset_for_now(int(os.environ["YEAR_OFFSET"]))
         time_delta = next_tweet["unix_seconds"].values[0] - then.timestamp()
         time_delta = time_delta if time_delta >= 0 else 0
-
-        
