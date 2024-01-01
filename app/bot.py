@@ -350,7 +350,7 @@ if __name__ == "__main__":
             check_profile += 1
 
         then_local = get_local_then(then, os.environ["LOCAL_TZ"])
-        # profile = set_profile(mastodon, then_local, profile)
+        profile = set_profile(mastodon, then_local, profile)
 
         if ((time_delta > 60) and (check_file == 60)) or first_time:
 
