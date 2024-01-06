@@ -286,6 +286,9 @@ def write_previous_posts(directory: str, posts: dict):
     
     return posts
 
+def get_next_post(df: pd.DataFrame, posts: dict):
+    return df.loc[~df["id_str"].isin(posts.keys())].head(1)
+
 
 if __name__ == "__main__":
 
@@ -312,7 +315,10 @@ if __name__ == "__main__":
     # Fetch ID of next tweet
     then = make_year_offset_for_now(int(os.environ["YEAR_OFFSET"]))
 
-    next_tweet = df.loc[df["unix_seconds"] > then.timestamp()].head(1)
+    # Get previous post dict
+    posted = get_previous_posts(file_dir)
+
+    next_tweet = get_next_post(df, posted)
 
     # Periodically download an updated profile
     check_profile = 0
@@ -321,9 +327,6 @@ if __name__ == "__main__":
     # Setting first time variables
     check_file = 60
     first_time = True
-
-    # Get previous post dict
-    posted = get_previous_posts(file_dir)
 
     # Test line: if you want to force it to post within 5 seconds, uncomment below
     # next_tweet["unix_seconds"].values[0] = then.timestamp() + 5
@@ -439,7 +442,7 @@ if __name__ == "__main__":
             # Get next tweet, set to first time
             print(f"Processed at {dt.datetime.now()}")
             then = make_year_offset_for_now(int(os.environ["YEAR_OFFSET"]))
-            next_tweet = df.loc[df["unix_seconds"] > then.timestamp()].head(1)
+            next_tweet = get_next_post(df, posted)
             first_time = True
             check_file = 0
             
