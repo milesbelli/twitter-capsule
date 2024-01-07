@@ -1,10 +1,12 @@
 from mastodon import Mastodon
+from mastodon import errors
 import os
 import datetime as dt
 import pandas as pd
 import json
 import time
 import pytz
+import html
 
 
 def test_post():
@@ -33,6 +35,36 @@ def is_reply(tweet: dict):
         return False
 
 
+def get_media(tweet: dict, position: int):
+    # Ensure there is an extended entities structure
+    if tweet["tweet"].get("entities"):
+        
+        # Ensure media is present
+        if tweet["tweet"]["entities"].get("media"):
+            
+            # Media structure is where we'll pull IDs from
+            media = tweet["tweet"]["extended_entities"]["media"] if \
+                 tweet["tweet"].get("extended_entities") else tweet["tweet"]["entities"]["media"]
+
+            # Make sure there's even something at this position
+            if len(media) >= (position + 1):
+
+                # Use media url as a proxy for ID
+                # The names of images in the archive contain the ID
+                media_url = media[position]["media_url"]
+
+                # The last part is what we're interested in
+                postfix = media_url.split("/")[-1]
+
+                # The tweet ID is also used for thre filename in the archive
+                prefix = tweet["tweet"]["id_str"]
+
+                return f"{prefix}-{postfix}"
+    
+    # If any of the above checks failed there is no image, so return an empty string
+    return ""
+
+
 def tweets_import(directory):
     # Open the tweets.js file and parse it correctly
     rawfile = open(f"{directory}/data/tweets.js")
@@ -55,11 +87,11 @@ def tweets_import(directory):
                 {
                     "id_str": tweet["tweet"]["id_str"],
                     "created_at": tweet["tweet"]["created_at"],
-                    "full_text": tweet["tweet"]["full_text"],
-                    "img1": "",
-                    "img2": "",
-                    "img3": "",
-                    "img4": "",
+                    "full_text": html.unescape(tweet["tweet"]["full_text"]),
+                    "img1": get_media(tweet, 0),
+                    "img2": get_media(tweet, 1),
+                    "img3": get_media(tweet, 2),
+                    "img4": get_media(tweet, 3),
                     "unix_seconds": timestamp_to_unix_seconds(tweet["tweet"]["created_at"]),
                     "is_reply": is_reply(tweet["tweet"])
                 }
@@ -144,7 +176,21 @@ def make_year_offset_for_now(offset):
 
 
 def get_profile(mastodon):
-    return mastodon.me()
+    while True:
+        try:
+            return mastodon.me()
+        
+        except errors.MastodonGatewayTimeoutError:
+            print(f"[{dt.datetime.now()}] Failed to get profile. Retrying...")
+            time.sleep(1)
+
+        except errors.MastodonInternalServerError:
+            print(f"[{dt.datetime.now()}] Mastodon had an internal server error while trying to get profile. Retrying...")
+            time.sleep(1)
+
+        except errors.MastodonBadGatewayError:
+            print(f"[{dt.datetime.now()}] Encountered a bad gateway error from the server. Retrying...")
+            time.sleep(1)
 
 
 # Set profile only updates if it detects a change
@@ -195,11 +241,14 @@ def set_profile(mastodon, then: dt.datetime, old_profile):
             print(f"Profile updated at {dt.datetime.now()}")
             return me
 
-        except mastodon.errors.MastodonGatewayTimeoutError:
-            print("Timed out while trying to update profile. Better luck next time.")
+        except errors.MastodonGatewayTimeoutError:
+            print(f"[{dt.datetime.now()}] Timed out while trying to update profile. Better luck next time.")
 
-        except mastodon.errors.MastodonInternalServerError:
-            print("Internal server error. Skipping.")
+        except errors.MastodonInternalServerError:
+            print(f"[{dt.datetime.now()}] Internal server error. Skipping.")
+
+        except errors.MastodonBadGatewayError:
+            print(f"[{dt.datetime.now()}] Encountered a bad gateway error from the server. Try again later.")
 
     return old_profile
 
@@ -207,6 +256,38 @@ def set_profile(mastodon, then: dt.datetime, old_profile):
 def get_local_then(then: dt.datetime, tz_name: str):
     tzinfo = pytz.timezone(tz_name)
     return then.astimezone(tz=tzinfo)
+
+
+def get_reply_to(tweet: dict, posts: dict):
+    reply_id = tweet["tweet"].get("in_reply_to_status_id_str")
+
+    if reply_id:
+        mastodon_id = posts.get(reply_id)
+    else:
+        mastodon_id = None
+
+    return mastodon_id
+
+
+def get_previous_posts(directory: str):
+    files_in_dir = os.listdir(directory)
+    if "posts.json" in files_in_dir:
+        with open(f"{directory}/posts.json") as postfile:
+            post_raw = postfile.read()
+            previous_post_dict = json.loads(post_raw)
+    else:
+        previous_post_dict = {}
+    return previous_post_dict
+
+
+def write_previous_posts(directory: str, posts: dict):
+    with open(f"{directory}/posts.json", "w") as postfile:
+        json.dump(posts, postfile)
+    
+    return posts
+
+def get_next_post(df: pd.DataFrame, posts: dict):
+    return df.loc[~df["id_str"].isin(posts.keys())].head(1)
 
 
 if __name__ == "__main__":
@@ -234,12 +315,16 @@ if __name__ == "__main__":
     # Fetch ID of next tweet
     then = make_year_offset_for_now(int(os.environ["YEAR_OFFSET"]))
 
-    next_tweet = df.loc[df["unix_seconds"] > then.timestamp()].head(1)
+    # Get previous post dict
+    posted = get_previous_posts(file_dir)
+
+    next_tweet = get_next_post(df, posted)
 
     # Periodically download an updated profile
     check_profile = 0
     profile = get_profile(mastodon)
 
+    # Setting first time variables
     check_file = 60
     first_time = True
 
@@ -270,8 +355,7 @@ if __name__ == "__main__":
         then_local = get_local_then(then, os.environ["LOCAL_TZ"])
         profile = set_profile(mastodon, then_local, profile)
 
-        if ((time_delta > 60) or first_time) and\
-            check_file == 60:
+        if ((time_delta > 60) and (check_file == 60)) or first_time:
 
             check_file = 0
 
@@ -285,6 +369,8 @@ if __name__ == "__main__":
 
             tweet_is_reply = next_tweet["is_reply"].values[0]
 
+            reply_to = get_reply_to(tweet_dict[next_tweet["id_str"].values[0]], posted)
+
             if privacy.upper() == "PUBLIC":
                 visibility = "public"
             elif privacy.upper() == "UNLISTED":
@@ -293,6 +379,9 @@ if __name__ == "__main__":
                 visiblity = "private"
             elif privacy.upper() == "SKIP":
                 visibility = "skip"
+            # Treat tweet threads (self replies) like regular tweets
+            elif reply_to:
+                visibility = os.environ["TWEET_PRIVACY"]
             elif tweet_is_reply:
                 visibility = os.environ["REPLY_PRIVACY"]
             else:
@@ -306,12 +395,13 @@ if __name__ == "__main__":
                 spoiler = None
 
             if first_time:
-                print(f"Next tweet at {dt.datetime.now() + dt.timedelta(seconds=time_delta)}:\n" +
-                      f"Status: {tweet_dict[str(next_tweet['id_str'].values[0])]['tweet']['full_text']}\n" +
+                print(f"[{dt.datetime.now()}] " +
+                      f"Next tweet at {dt.datetime.now() + dt.timedelta(seconds=time_delta)}:\n" +
+                      f"Status: {html.unescape(tweet_dict[str(next_tweet['id_str'].values[0])]['tweet']['full_text'])}\n" +
                       f"Privacy: {visibility}\n" +
-                      f"Content Warning: {spoiler}\n")
+                      f"Content Warning: {spoiler}")
 
-            first_time = False
+                first_time = False
             
         check_file += 1
 
@@ -323,25 +413,38 @@ if __name__ == "__main__":
                 while not msg_sent:
 
                     try:
-                        post_text = tweet_dict[next_tweet["id_str"].values[0]]["tweet"]["full_text"]
-                        mastodon.status_post(post_text,
-                                            visibility=visibility,
-                                            spoiler_text=spoiler)
+                        post_text = html.unescape(tweet_dict[next_tweet["id_str"].values[0]]["tweet"]["full_text"])
+                        response = mastodon.status_post(post_text,
+                                                        visibility=visibility,
+                                                        spoiler_text=spoiler,
+                                                        in_reply_to_id=reply_to)
 
                         msg_sent = True
+                        posted[next_tweet_id] = response["id"]
 
-                    except mastodon.errors.MastodonGatewayTimeoutError:
+                    except errors.MastodonGatewayTimeoutError:
                         msg_sent = False
-                        print("Timed out! Retrying...")
+                        print(f"[{dt.datetime.now()}] Timed out! Retrying...")
 
-                    except mastodon.errors.MastodonInternalServerError:
+                    except errors.MastodonInternalServerError:
                         msg_sent = False
-                        print("Internal server error! Retrying...")
+                        print(f"[{dt.datetime.now()}] Internal server error! Retrying...")
+
+                    except errors.MastodonBadGatewayError:
+                        msg_sent = False
+                        print(f"[{dt.datetime.now()}] Encountered a bad gateway error from the server. Retrying...")
+
+            else:
+                posted[next_tweet_id] = None
+
+            write_previous_posts(file_dir, posted)
 
             # Get next tweet, set to first time
+            print(f"Processed at {dt.datetime.now()}")
             then = make_year_offset_for_now(int(os.environ["YEAR_OFFSET"]))
-            next_tweet = df.loc[df["unix_seconds"] > then.timestamp()].head(1)
+            next_tweet = get_next_post(df, posted)
             first_time = True
+            check_file = 0
             
 
         time.sleep(1)
@@ -350,5 +453,3 @@ if __name__ == "__main__":
         then = make_year_offset_for_now(int(os.environ["YEAR_OFFSET"]))
         time_delta = next_tweet["unix_seconds"].values[0] - then.timestamp()
         time_delta = time_delta if time_delta >= 0 else 0
-
-        
