@@ -195,8 +195,8 @@ def get_profile(mastodon):
 
 # Set profile only updates if it detects a change
 def set_profile(mastodon, then: dt.datetime, old_profile):
-    disp_name = os.environ["PROFILE_NAME"].replace("%Y", str(then.year))
-    description = os.environ["PROFILE_DESC"].replace("%Y", str(then.year))
+    disp_name = then.strftime(os.environ["PROFILE_NAME"])
+    description = then.strftime(os.environ["PROFILE_DESC"])
 
     all_fields = old_profile["source"]["fields"]
     field_list = []
