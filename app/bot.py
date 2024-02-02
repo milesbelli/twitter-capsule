@@ -192,6 +192,10 @@ def get_profile(mastodon):
             print(f"[{dt.datetime.now()}] Encountered a bad gateway error from the server. Retrying...")
             time.sleep(1)
 
+        except errors.MastodonNetworkError as e:
+            print(f"[{dt.datetime.now()}] Mastodon Network Error: {e}")
+            time.sleep(60)
+
 
 # Set profile only updates if it detects a change
 def set_profile(mastodon, then: dt.datetime, old_profile):
@@ -249,6 +253,9 @@ def set_profile(mastodon, then: dt.datetime, old_profile):
 
         except errors.MastodonBadGatewayError:
             print(f"[{dt.datetime.now()}] Encountered a bad gateway error from the server. Try again later.")
+
+        except errors.MastodonNetworkError as e:
+            print(f"[{dt.datetime.now()}] Mastodon Network Error: {e}")
 
     return old_profile
 
@@ -433,6 +440,10 @@ if __name__ == "__main__":
                     except errors.MastodonBadGatewayError:
                         msg_sent = False
                         print(f"[{dt.datetime.now()}] Encountered a bad gateway error from the server. Retrying...")
+
+                    except errors.MastodonNetworkError as e:
+                        msg_sent = False
+                        print(f"[{dt.datetime.now()}] Mastodon Network Error: {e}")
 
             else:
                 posted[next_tweet_id] = None
