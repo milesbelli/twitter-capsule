@@ -181,7 +181,7 @@ def get_profile(mastodon):
             return mastodon.me()
         
         except errors.MastodonGatewayTimeoutError:
-            print(f"[{dt.datetime.now()}] Failed to get profile. Retrying...")
+            print(f"[{dt.datetime.now()}] Timed out while trying to get profile. Retrying...")
             time.sleep(1)
 
         except errors.MastodonInternalServerError:
@@ -189,11 +189,11 @@ def get_profile(mastodon):
             time.sleep(1)
 
         except errors.MastodonBadGatewayError:
-            print(f"[{dt.datetime.now()}] Encountered a bad gateway error from the server. Retrying...")
+            print(f"[{dt.datetime.now()}] Encountered a bad gateway error from the server while trying to get profile. Retrying...")
             time.sleep(1)
 
         except errors.MastodonNetworkError as e:
-            print(f"[{dt.datetime.now()}] Mastodon Network Error: {e}")
+            print(f"[{dt.datetime.now()}] Mastodon Network Error while trying to get profile: {e}")
             time.sleep(60)
 
 
@@ -249,13 +249,13 @@ def set_profile(mastodon, then: dt.datetime, old_profile):
             print(f"[{dt.datetime.now()}] Timed out while trying to update profile. Better luck next time.")
 
         except errors.MastodonInternalServerError:
-            print(f"[{dt.datetime.now()}] Internal server error. Skipping.")
+            print(f"[{dt.datetime.now()}] Internal server error while trying to update profile. Skipping.")
 
         except errors.MastodonBadGatewayError:
-            print(f"[{dt.datetime.now()}] Encountered a bad gateway error from the server. Try again later.")
+            print(f"[{dt.datetime.now()}] Encountered a bad gateway error while updating profile. Try again later.")
 
         except errors.MastodonNetworkError as e:
-            print(f"[{dt.datetime.now()}] Mastodon Network Error: {e}")
+            print(f"[{dt.datetime.now()}] Mastodon Network Error occurred while attempting to update profile: {e}")
 
     return old_profile
 
@@ -431,19 +431,19 @@ if __name__ == "__main__":
 
                     except errors.MastodonGatewayTimeoutError:
                         msg_sent = False
-                        print(f"[{dt.datetime.now()}] Timed out! Retrying...")
+                        print(f"[{dt.datetime.now()}] Timed out while posting! Retrying...")
 
                     except errors.MastodonInternalServerError:
                         msg_sent = False
-                        print(f"[{dt.datetime.now()}] Internal server error! Retrying...")
+                        print(f"[{dt.datetime.now()}] Internal server error while posting! Retrying...")
 
                     except errors.MastodonBadGatewayError:
                         msg_sent = False
-                        print(f"[{dt.datetime.now()}] Encountered a bad gateway error from the server. Retrying...")
+                        print(f"[{dt.datetime.now()}] Encountered a bad gateway error from the server while posting. Retrying...")
 
                     except errors.MastodonNetworkError as e:
                         msg_sent = False
-                        print(f"[{dt.datetime.now()}] Mastodon Network Error: {e}")
+                        print(f"[{dt.datetime.now()}] Mastodon Network Error while posting: {e}")
 
             else:
                 posted[next_tweet_id] = None
