@@ -162,15 +162,27 @@ def make_year_offset_for_now(offset):
     tzinfo = dt.timezone(dt.timedelta(hours=0))
     utc_now = dt.datetime.now(tzinfo)
 
-    time_then = dt.datetime(
-        year=(utc_now.year - offset),
-        month=utc_now.month,
-        day=utc_now.day,
-        hour=utc_now.hour,
-        minute=utc_now.minute,
-        second=utc_now.second,
-        tzinfo=utc_now.tzinfo
-    )
+    # May need to account for a leap day
+    day_offset = 0
+    date_set = False
+
+    while not date_set:
+
+        try:
+            time_then = dt.datetime(
+                year=(utc_now.year - offset),
+                month=utc_now.month,
+                day=(utc_now.day - day_offset),
+                hour=utc_now.hour,
+                minute=utc_now.minute,
+                second=utc_now.second,
+                tzinfo=utc_now.tzinfo
+            )
+            date_set = True
+        
+        # That day doesn't exist in this year, so try going 1 day back
+        except ValueError:
+            day_offset += 1
 
     return time_then
 
