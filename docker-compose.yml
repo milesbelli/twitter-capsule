@@ -4,6 +4,8 @@ services:
 
   social:
     image: milesbelli/twitter-time-capsule:latest
+    networks:
+      - ip6net
     build: ./
     container_name: twitter_bot
     restart: always
@@ -28,3 +30,10 @@ services:
     # Left hand side is directory outside the container, where
     # the output editor file and twitter archive will live
       - ./files/:/twitterbot/files/
+
+networks:
+  ip6net:
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 2001:0DB8::/112

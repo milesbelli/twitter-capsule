@@ -162,15 +162,27 @@ def make_year_offset_for_now(offset):
     tzinfo = dt.timezone(dt.timedelta(hours=0))
     utc_now = dt.datetime.now(tzinfo)
 
-    time_then = dt.datetime(
-        year=(utc_now.year - offset),
-        month=utc_now.month,
-        day=utc_now.day,
-        hour=utc_now.hour,
-        minute=utc_now.minute,
-        second=utc_now.second,
-        tzinfo=utc_now.tzinfo
-    )
+    # May need to account for a leap day
+    day_offset = 0
+    date_set = False
+
+    while not date_set:
+
+        try:
+            time_then = dt.datetime(
+                year=(utc_now.year - offset),
+                month=utc_now.month,
+                day=(utc_now.day - day_offset),
+                hour=utc_now.hour,
+                minute=utc_now.minute,
+                second=utc_now.second,
+                tzinfo=utc_now.tzinfo
+            )
+            date_set = True
+        
+        # That day doesn't exist in this year, so try going 1 day back
+        except ValueError:
+            day_offset += 1
 
     return time_then
 
@@ -181,7 +193,7 @@ def get_profile(mastodon):
             return mastodon.me()
         
         except errors.MastodonGatewayTimeoutError:
-            print(f"[{dt.datetime.now()}] Failed to get profile. Retrying...")
+            print(f"[{dt.datetime.now()}] Timed out while trying to get profile. Retrying...")
             time.sleep(1)
 
         except errors.MastodonInternalServerError:
@@ -189,14 +201,18 @@ def get_profile(mastodon):
             time.sleep(1)
 
         except errors.MastodonBadGatewayError:
-            print(f"[{dt.datetime.now()}] Encountered a bad gateway error from the server. Retrying...")
+            print(f"[{dt.datetime.now()}] Encountered a bad gateway error from the server while trying to get profile. Retrying...")
             time.sleep(1)
+
+        except errors.MastodonNetworkError as e:
+            print(f"[{dt.datetime.now()}] Mastodon Network Error while trying to get profile: {e}")
+            time.sleep(60)
 
 
 # Set profile only updates if it detects a change
 def set_profile(mastodon, then: dt.datetime, old_profile):
-    disp_name = os.environ["PROFILE_NAME"].replace("%Y", str(then.year))
-    description = os.environ["PROFILE_DESC"].replace("%Y", str(then.year))
+    disp_name = then.strftime(os.environ["PROFILE_NAME"])
+    description = then.strftime(os.environ["PROFILE_DESC"])
 
     all_fields = old_profile["source"]["fields"]
     field_list = []
@@ -245,10 +261,13 @@ def set_profile(mastodon, then: dt.datetime, old_profile):
             print(f"[{dt.datetime.now()}] Timed out while trying to update profile. Better luck next time.")
 
         except errors.MastodonInternalServerError:
-            print(f"[{dt.datetime.now()}] Internal server error. Skipping.")
+            print(f"[{dt.datetime.now()}] Internal server error while trying to update profile. Skipping.")
 
         except errors.MastodonBadGatewayError:
-            print(f"[{dt.datetime.now()}] Encountered a bad gateway error from the server. Try again later.")
+            print(f"[{dt.datetime.now()}] Encountered a bad gateway error while updating profile. Try again later.")
+
+        except errors.MastodonNetworkError as e:
+            print(f"[{dt.datetime.now()}] Mastodon Network Error occurred while attempting to update profile: {e}")
 
     return old_profile
 
@@ -424,15 +443,19 @@ if __name__ == "__main__":
 
                     except errors.MastodonGatewayTimeoutError:
                         msg_sent = False
-                        print(f"[{dt.datetime.now()}] Timed out! Retrying...")
+                        print(f"[{dt.datetime.now()}] Timed out while posting! Retrying...")
 
                     except errors.MastodonInternalServerError:
                         msg_sent = False
-                        print(f"[{dt.datetime.now()}] Internal server error! Retrying...")
+                        print(f"[{dt.datetime.now()}] Internal server error while posting! Retrying...")
 
                     except errors.MastodonBadGatewayError:
                         msg_sent = False
-                        print(f"[{dt.datetime.now()}] Encountered a bad gateway error from the server. Retrying...")
+                        print(f"[{dt.datetime.now()}] Encountered a bad gateway error from the server while posting. Retrying...")
+
+                    except errors.MastodonNetworkError as e:
+                        msg_sent = False
+                        print(f"[{dt.datetime.now()}] Mastodon Network Error while posting: {e}")
 
             else:
                 posted[next_tweet_id] = None
