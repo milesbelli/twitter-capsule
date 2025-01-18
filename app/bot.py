@@ -313,9 +313,10 @@ if __name__ == "__main__":
 
     # Set up Mastodon account credentials
     token = os.environ["ACCESS_TOKEN"]
+    api_url = os.environ["INSTANCE"]
     mastodon = Mastodon(
             access_token=token,
-            api_base_url="https://botsin.space/"
+            api_base_url=api_url
         )
 
     # test_post()
