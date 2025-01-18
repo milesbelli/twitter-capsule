@@ -24,6 +24,8 @@ services:
     - PROFILE_DESC=
     # Set timezone you want profile to be associated with
     - LOCAL_TZ=America/New_York
+    # Set URL of the bot's instance
+    - INSTANCE=
     # This is so the output logs work in Docker
     - PYTHONUNBUFFERED=1
     volumes:
