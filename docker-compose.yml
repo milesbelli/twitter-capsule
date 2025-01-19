@@ -28,6 +28,10 @@ services:
     - INSTANCE=
     # This is so the output logs work in Docker
     - PYTHONUNBUFFERED=1
+    # Set year field in profile
+    - PROFILE_YEAR=TRUE
+    # Set day field in profile
+    - PROFILE_DAY=TRUE
     volumes:
     # Left hand side is directory outside the container, where
     # the output editor file and twitter archive will live

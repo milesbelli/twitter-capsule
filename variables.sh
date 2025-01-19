@@ -14,3 +14,7 @@ export PROFILE_DESC=""
 export LOCAL_TZ="America/New_York"
 # Set URL of the bot's instance
 export INSTANCE=""
+# Set year field in profile. Can be TRUE or FALSE
+export PROFILE_YEAR=TRUE
+# Set day field in profile. Can be TRUE or FALSE
+export PROFILE_DAY=TRUE

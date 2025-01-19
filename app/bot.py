@@ -216,8 +216,8 @@ def set_profile(mastodon, then: dt.datetime, old_profile):
 
     all_fields = old_profile["source"]["fields"]
     field_list = []
-    need_to_add_year = True
-    need_to_add_day = True
+    need_to_add_year = True if os.environ["PROFILE_YEAR"] == "TRUE" else False
+    need_to_add_day = True if os.environ["PROFILE_DAY"] == "TRUE" else False
 
     old_year = old_day = ""
 
