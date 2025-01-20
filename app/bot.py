@@ -220,17 +220,17 @@ def set_profile(mastodon, then: dt.datetime, old_profile):
     need_to_add_day = True if os.environ["PROFILE_DAY"] == "TRUE" else False
 
     old_year = old_day = ""
-
-    new_year = str(then.year)
-    new_day = then.strftime("%A")
+    new_year = new_day = ""
 
     # Go through all fields, update the ones which are automatic
     for field in all_fields:
         if field["name"] == "The year is":
+            new_year = str(then.year)
             old_year = field["value"]
             field_list.append((field["name"], new_year))
             need_to_add_year = False
         elif field["name"] == "The day is":
+            new_day = then.strftime("%A")
             old_day = field["value"]
             field_list.append((field["name"], new_day))
             need_to_add_day = False
@@ -269,6 +269,7 @@ def set_profile(mastodon, then: dt.datetime, old_profile):
         except errors.MastodonNetworkError as e:
             print(f"[{dt.datetime.now()}] Mastodon Network Error occurred while attempting to update profile: {e}")
 
+    time.sleep(30)
     return old_profile
 
 
@@ -445,18 +446,22 @@ if __name__ == "__main__":
                     except errors.MastodonGatewayTimeoutError:
                         msg_sent = False
                         print(f"[{dt.datetime.now()}] Timed out while posting! Retrying...")
+                        time.sleep(30)
 
                     except errors.MastodonInternalServerError:
                         msg_sent = False
                         print(f"[{dt.datetime.now()}] Internal server error while posting! Retrying...")
+                        time.sleep(30)
 
                     except errors.MastodonBadGatewayError:
                         msg_sent = False
                         print(f"[{dt.datetime.now()}] Encountered a bad gateway error from the server while posting. Retrying...")
+                        time.sleep(30)
 
                     except errors.MastodonNetworkError as e:
                         msg_sent = False
                         print(f"[{dt.datetime.now()}] Mastodon Network Error while posting: {e}")
+                        time.sleep(30)
 
             else:
                 posted[next_tweet_id] = None
