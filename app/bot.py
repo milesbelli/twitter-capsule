@@ -259,17 +259,20 @@ def set_profile(mastodon, then: dt.datetime, old_profile):
 
         except errors.MastodonGatewayTimeoutError:
             print(f"[{dt.datetime.now()}] Timed out while trying to update profile. Better luck next time.")
+            time.sleep(30)
 
         except errors.MastodonInternalServerError:
             print(f"[{dt.datetime.now()}] Internal server error while trying to update profile. Skipping.")
+            time.sleep(30)
 
         except errors.MastodonBadGatewayError:
             print(f"[{dt.datetime.now()}] Encountered a bad gateway error while updating profile. Try again later.")
+            time.sleep(30)
 
         except errors.MastodonNetworkError as e:
             print(f"[{dt.datetime.now()}] Mastodon Network Error occurred while attempting to update profile: {e}")
+            time.sleep(30)
 
-    time.sleep(30)
     return old_profile
 
 
