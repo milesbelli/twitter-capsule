@@ -24,10 +24,16 @@ services:
     - PROFILE_DESC=
     # Set timezone you want profile to be associated with
     - LOCAL_TZ=America/New_York
+    # Set URL of the bot's instance
+    - INSTANCE=
     # This is so the output logs work in Docker
     - PYTHONUNBUFFERED=1
     # Delete all posts? This will immediately start to delete all posts. Don't set this if you're not serious.
     - DELETE_ALL_POSTS=N
+    # Set year field in profile
+    - PROFILE_YEAR=TRUE
+    # Set day field in profile
+    - PROFILE_DAY=TRUE
     volumes:
     # Left hand side is directory outside the container, where
     # the output editor file and twitter archive will live

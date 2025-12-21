@@ -216,21 +216,21 @@ def set_profile(mastodon, then: dt.datetime, old_profile):
 
     all_fields = old_profile["source"]["fields"]
     field_list = []
-    need_to_add_year = True
-    need_to_add_day = True
+    need_to_add_year = True if os.environ["PROFILE_YEAR"] == "TRUE" else False
+    need_to_add_day = True if os.environ["PROFILE_DAY"] == "TRUE" else False
 
     old_year = old_day = ""
-
-    new_year = str(then.year)
-    new_day = then.strftime("%A")
+    new_year = new_day = ""
 
     # Go through all fields, update the ones which are automatic
     for field in all_fields:
         if field["name"] == "The year is":
+            new_year = str(then.year)
             old_year = field["value"]
             field_list.append((field["name"], new_year))
             need_to_add_year = False
         elif field["name"] == "The day is":
+            new_day = then.strftime("%A")
             old_day = field["value"]
             field_list.append((field["name"], new_day))
             need_to_add_day = False
@@ -259,15 +259,19 @@ def set_profile(mastodon, then: dt.datetime, old_profile):
 
         except errors.MastodonGatewayTimeoutError:
             print(f"[{dt.datetime.now()}] Timed out while trying to update profile. Better luck next time.")
+            time.sleep(30)
 
         except errors.MastodonInternalServerError:
             print(f"[{dt.datetime.now()}] Internal server error while trying to update profile. Skipping.")
+            time.sleep(30)
 
         except errors.MastodonBadGatewayError:
             print(f"[{dt.datetime.now()}] Encountered a bad gateway error while updating profile. Try again later.")
+            time.sleep(30)
 
         except errors.MastodonNetworkError as e:
             print(f"[{dt.datetime.now()}] Mastodon Network Error occurred while attempting to update profile: {e}")
+            time.sleep(30)
 
     return old_profile
 
@@ -313,9 +317,10 @@ if __name__ == "__main__":
 
     # Set up Mastodon account credentials
     token = os.environ["ACCESS_TOKEN"]
+    api_url = os.environ["INSTANCE"]
     mastodon = Mastodon(
             access_token=token,
-            api_base_url="https://botsin.space/"
+            api_base_url=api_url
         )
 
     # test_post()
@@ -444,18 +449,22 @@ if __name__ == "__main__":
                     except errors.MastodonGatewayTimeoutError:
                         msg_sent = False
                         print(f"[{dt.datetime.now()}] Timed out while posting! Retrying...")
+                        time.sleep(30)
 
                     except errors.MastodonInternalServerError:
                         msg_sent = False
                         print(f"[{dt.datetime.now()}] Internal server error while posting! Retrying...")
+                        time.sleep(30)
 
                     except errors.MastodonBadGatewayError:
                         msg_sent = False
                         print(f"[{dt.datetime.now()}] Encountered a bad gateway error from the server while posting. Retrying...")
+                        time.sleep(30)
 
                     except errors.MastodonNetworkError as e:
                         msg_sent = False
                         print(f"[{dt.datetime.now()}] Mastodon Network Error while posting: {e}")
+                        time.sleep(30)
 
             else:
                 posted[next_tweet_id] = None
