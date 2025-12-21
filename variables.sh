@@ -12,3 +12,5 @@ export PROFILE_NAME=""
 export PROFILE_DESC=""
 # Set timezone you want profile to be associated with
 export LOCAL_TZ="America/New_York"
+# Delete all posts? This will immediately start to delete all posts. Don't set this if you're not serious.
+export DELETE_ALL_POSTS="N"

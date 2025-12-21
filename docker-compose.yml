@@ -26,6 +26,8 @@ services:
     - LOCAL_TZ=America/New_York
     # This is so the output logs work in Docker
     - PYTHONUNBUFFERED=1
+    # Delete all posts? This will immediately start to delete all posts. Don't set this if you're not serious.
+    - DELETE_ALL_POSTS=N
     volumes:
     # Left hand side is directory outside the container, where
     # the output editor file and twitter archive will live
