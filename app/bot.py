@@ -313,6 +313,105 @@ def get_next_post(df: pd.DataFrame, posts: dict):
     return df.loc[~df["id_str"].isin(posts.keys())].head(1)
 
 
+def get_media_file_path(archive_directory: str, media_filename: str):
+    """
+    Get the full path to a media file from the Twitter archive.
+    Returns None if the file doesn't exist.
+    """
+    if not media_filename:
+        return None
+    
+    media_path = os.path.join(archive_directory, "data", "tweets_media", media_filename)
+    
+    if os.path.exists(media_path):
+        return media_path
+    
+    return None
+
+
+def upload_media_with_retry(mastodon, media_path, description=None, max_retries=3):
+    """
+    Upload a single media file to Mastodon with retry logic.
+    Handles timeouts and network errors with exponential backoff.
+    Returns media dict with 'id' on success, None on failure.
+    """
+    retry_count = 0
+    retry_delay = 10
+    
+    while retry_count < max_retries:
+        try:
+            print(f"[{dt.datetime.now()}] Uploading media: {os.path.basename(media_path)}")
+            
+            with open(media_path, "rb") as media_file:
+                media_response = mastodon.media_post(
+                    media_file=media_file,
+                    description=description
+                )
+            
+            print(f"[{dt.datetime.now()}] Successfully uploaded media: {os.path.basename(media_path)}")
+            return media_response
+        
+        except errors.MastodonGatewayTimeoutError:
+            retry_count += 1
+            print(f"[{dt.datetime.now()}] Gateway timeout uploading media. Attempt {retry_count}/{max_retries}")
+            if retry_count < max_retries:
+                time.sleep(retry_delay)
+        
+        except errors.MastodonInternalServerError:
+            retry_count += 1
+            print(f"[{dt.datetime.now()}] Server error uploading media. Attempt {retry_count}/{max_retries}")
+            if retry_count < max_retries:
+                time.sleep(retry_delay)
+        
+        except errors.MastodonBadGatewayError:
+            retry_count += 1
+            print(f"[{dt.datetime.now()}] Bad gateway error uploading media. Attempt {retry_count}/{max_retries}")
+            if retry_count < max_retries:
+                time.sleep(retry_delay)
+        
+        except errors.MastodonNetworkError as e:
+            retry_count += 1
+            print(f"[{dt.datetime.now()}] Network error uploading media: {e}. Attempt {retry_count}/{max_retries}")
+            if retry_count < max_retries:
+                time.sleep(retry_delay * 2)
+        
+        except (FileNotFoundError, IOError) as e:
+            print(f"[{dt.datetime.now()}] Error reading media file {media_path}: {e}")
+            return None
+    
+    print(f"[{dt.datetime.now()}] Failed to upload media after {max_retries} attempts: {os.path.basename(media_path)}")
+    return None
+
+
+def upload_media_for_tweet(mastodon, archive_directory, media_filenames, media_captions=None):
+    """
+    Upload all media files for a tweet before posting.
+    Returns list of media dicts with 'id' fields.
+    """
+    media_ids = []
+    
+    for idx, filename in enumerate(media_filenames):
+        if not filename:
+            continue
+        
+        media_path = get_media_file_path(archive_directory, filename)
+        
+        if not media_path:
+            print(f"[{dt.datetime.now()}] Media file not found: {filename}")
+            continue
+        
+        description = None
+        if media_captions and idx < len(media_captions) and media_captions[idx]:
+            description = media_captions[idx]
+        
+        media = upload_media_with_retry(mastodon, media_path, description)
+        
+        if media:
+            media_ids.append(media)
+    
+    return media_ids
+
+
 if __name__ == "__main__":
 
     # Set up Mastodon account credentials
@@ -429,6 +528,27 @@ if __name__ == "__main__":
             
         check_file += 1
 
+        # Upload media ahead of post time (60+ seconds before posting)
+        if (time_delta > 60) and (time_delta < 65):
+            media_filenames = [
+                next_tweet["img1"].values[0],
+                next_tweet["img2"].values[0],
+                next_tweet["img3"].values[0],
+                next_tweet["img4"].values[0]
+            ]
+            
+            media_captions = [
+                tweet_settings["img1_caption"].values[0],
+                tweet_settings["img2_caption"].values[0],
+                tweet_settings["img3_caption"].values[0],
+                tweet_settings["img4_caption"].values[0]
+            ]
+            
+            media_ids = upload_media_for_tweet(mastodon, archive_directory, media_filenames, media_captions)
+            
+            # Store media IDs for use when posting
+            next_tweet.loc[:, "_media_ids"] = [media_ids]
+
         # Send toot at scheduled time, go back to fetch next ID
         if time_delta < 1:
             if visibility != "skip":
@@ -438,7 +558,12 @@ if __name__ == "__main__":
 
                     try:
                         post_text = html.unescape(tweet_dict[next_tweet["id_str"].values[0]]["tweet"]["full_text"])
+                        
+                        # Use uploaded media IDs if available
+                        media_ids = next_tweet.get("_media_ids", [None])[0]
+                        
                         response = mastodon.status_post(post_text,
+                                                        media_ids=media_ids if media_ids else None,
                                                         visibility=visibility,
                                                         spoiler_text=spoiler,
                                                         in_reply_to_id=reply_to)
