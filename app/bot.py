@@ -342,11 +342,10 @@ def upload_media_with_retry(mastodon, media_path, description=None, max_retries=
         try:
             print(f"[{dt.datetime.now()}] Uploading media: {os.path.basename(media_path)}")
             
-            with open(media_path, "rb") as media_file:
-                media_response = mastodon.media_post(
-                    media_file=media_file,
-                    description=description
-                )
+            media_response = mastodon.media_post(
+                media_file=media_path,
+                description=description
+            )
             
             print(f"[{dt.datetime.now()}] Successfully uploaded media: {os.path.basename(media_path)}")
             return media_response
@@ -401,13 +400,14 @@ def upload_media_for_tweet(mastodon, archive_directory, media_filenames, media_c
             continue
         
         description = None
-        if media_captions and idx < len(media_captions) and media_captions[idx]:
+        if media_captions and idx < len(media_captions) and media_captions[idx] != "nan":
             description = media_captions[idx]
         
         media = upload_media_with_retry(mastodon, media_path, description)
         
         if media:
-            media_ids.append(media)
+            str_id = str(media.get("id"))
+            media_ids.append(str_id)
     
     return media_ids
 
@@ -450,6 +450,8 @@ if __name__ == "__main__":
     # Setting first time variables
     check_file = 60
     first_time = True
+    uploaded_media_for_next_tweet = False
+    media_ids = []
 
     # Test line: if you want to force it to post within 5 seconds, uncomment below
     # next_tweet["unix_seconds"].values[0] = then.timestamp() + 5
@@ -499,7 +501,7 @@ if __name__ == "__main__":
             elif privacy.upper() == "UNLISTED":
                 visibility = "unlisted"
             elif privacy.upper() == "PRIVATE":
-                visiblity = "private"
+                visibility = "private"
             elif privacy.upper() == "SKIP":
                 visibility = "skip"
             # Treat tweet threads (self replies) like regular tweets
@@ -529,7 +531,7 @@ if __name__ == "__main__":
         check_file += 1
 
         # Upload media ahead of post time (60+ seconds before posting)
-        if (time_delta > 60) and (time_delta < 65):
+        if (time_delta < 65) and (not uploaded_media_for_next_tweet):
             media_filenames = [
                 next_tweet["img1"].values[0],
                 next_tweet["img2"].values[0],
@@ -546,8 +548,7 @@ if __name__ == "__main__":
             
             media_ids = upload_media_for_tweet(mastodon, archive_directory, media_filenames, media_captions)
             
-            # Store media IDs for use when posting
-            next_tweet.loc[:, "_media_ids"] = [media_ids]
+            uploaded_media_for_next_tweet = True
 
         # Send toot at scheduled time, go back to fetch next ID
         if time_delta < 1:
@@ -558,12 +559,9 @@ if __name__ == "__main__":
 
                     try:
                         post_text = html.unescape(tweet_dict[next_tweet["id_str"].values[0]]["tweet"]["full_text"])
-                        
-                        # Use uploaded media IDs if available
-                        media_ids = next_tweet.get("_media_ids", [None])[0]
-                        
+                                                
                         response = mastodon.status_post(post_text,
-                                                        media_ids=media_ids if media_ids else None,
+                                                        media_ids=media_ids if len(media_ids) > 0 else None,
                                                         visibility=visibility,
                                                         spoiler_text=spoiler,
                                                         in_reply_to_id=reply_to)
@@ -602,6 +600,8 @@ if __name__ == "__main__":
             next_tweet = get_next_post(df, posted)
             first_time = True
             check_file = 0
+            uploaded_media_for_next_tweet = False
+            media_ids = []
             
 
         time.sleep(1)
